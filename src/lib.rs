@@ -1,22 +1,14 @@
 // // #![allow(dead_code)]
-//! main library
+//! Library to more easily drive the led matrix.
 
 #![warn(missing_docs)]
 use std::time::{Duration, Instant};
 mod display;
-pub use display::{DisplayInterface, LedColor, Paused, Running, State, Stopped, Sync, SyncType};
+mod error;
 
-/// Placeholder for rppal's OutputPin type
-#[derive(Debug)]
-pub(self) struct OutputPinPlaceholder;
-
-/// Placeholder for rppal's Level type
-#[allow(dead_code)]
-#[derive(Debug)]
-pub(self) enum LevelPlaceholder {
-    Low,
-    High,
-}
+// Crate API exports
+pub use display::{DisplayInterface, LedColor, State, Sync, SyncType};
+pub use error::{DisplayResult, Error};
 
 #[allow(dead_code)]
 pub(self) mod pins {
@@ -28,7 +20,7 @@ pub(self) mod pins {
     pub type A0PinNr = u8;
     pub type A1PinNr = u8;
     pub type A2PinNr = u8;
-    pub type PinInitError = String;
+    pub type LEPinNr = u8;
 }
 
 /// GPIO pin numbers to use for shift registers and decoders.
@@ -48,8 +40,8 @@ pub struct PinConfig {
     /// Serial clear pin of the shift register
     pub sr_srclr: pins::SrclrPinNr, // shift register serial clear
 
-    /// Output enable pin of the shift register
-    pub sr_oe: pins::OePinNr, // shift register output enable
+    /// Output enable pin of the shift register (active low)
+    pub sr_oe: pins::OePinNr, // shift register output enable (active low)
 
     /// First decoder bit. This is the least significant bit, equivalent to 1.
     pub dec_a0: pins::A0PinNr, // decoder pin 0
@@ -59,25 +51,18 @@ pub struct PinConfig {
 
     /// Third decoder bit. This is the most significant bit, equivalent to 4.
     pub dec_a2: pins::A2PinNr, // decoder pin 2
+
+    /// Decoder Latch Enable. If enabled the changes to the input of the decoder will nog affect the output.
+    pub dec_le: pins::LEPinNr,
 }
 
 #[inline]
-// pub fn spin_wait(dur: Duration) {
 /// Wait for the given duration `dur`
 pub(crate) fn spin_wait(dur: Duration) {
     let t = Instant::now();
     while t.elapsed() < dur {
         std::hint::spin_loop();
     }
-}
-
-impl OutputPinPlaceholder {
-    fn set_low(&mut self) {}
-
-    fn set_high(&mut self) {}
-
-    #[allow(unused_variables)]
-    fn write(&mut self, level: LevelPlaceholder) {}
 }
 
 /// Stops code execution until an enter is received from `stdin`.
@@ -97,6 +82,33 @@ macro_rules! breakpoint {
     };
     ($($arg:tt)*) => {
         #[cfg(feature = "breakpoints")]
+        {
+            use std::io::{stdin, stdout, Write};
+
+            log::debug!("breakpoint!\t{}", format_args!($($arg)*));
+            stdout().flush().unwrap();
+            stdin().read_line(&mut String::new()).unwrap();
+        }
+    };
+}
+
+/// Stops code execution until an enter is received from `stdin`.
+///
+/// Can be passed a string that will be logged with debug level.
+#[macro_export]
+macro_rules! breakpoint_sbs {
+    () => {
+        #[cfg(feature = "sbs_debug")]
+        {
+            use std::io::{stdin, stdout, Write};
+
+            log::debug!("breakpoint!");
+            stdout().flush().unwrap();
+            stdin().read_line(&mut String::new()).unwrap();
+        }
+    };
+    ($($arg:tt)*) => {
+        #[cfg(feature = "sbs_debug")]
         {
             use std::io::{stdin, stdout, Write};
 

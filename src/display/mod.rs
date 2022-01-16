@@ -12,3 +12,6 @@ use dec::*;
 
 mod interface_components;
 pub use interface_components::*;
+
+mod display_manager;
+use display_manager::*;

@@ -1,24 +1,20 @@
-use crate::{
-    pins::{A0PinNr, A1PinNr, A2PinNr, PinInitError},
-    LevelPlaceholder, OutputPinPlaceholder,
-};
+use std::time::Duration;
 
-// macro_rules! to_level {
-//     ($in:tt, $shift:tt) => {
-//         match $in & (1 << $shift) {
-//             0 => LevelPlaceholder::Low,
-//             1 => LevelPlaceholder::High,
-//             _ => unreachable!(),
-//         }
-//     };
-// }
+use rppal::gpio::{Gpio, Level, OutputPin};
+
+use crate::{
+    error,
+    pins::{A0PinNr, A1PinNr, A2PinNr, LEPinNr},
+    spin_wait,
+};
 
 #[derive(Debug)]
 pub(super) struct Dec {
-    // a: [OutputPinPlaceholder; 3],
-    a0: OutputPinPlaceholder,
-    a1: OutputPinPlaceholder,
-    a2: OutputPinPlaceholder,
+    // a: [OutputPin; 3],
+    a0: OutputPin,
+    a1: OutputPin,
+    a2: OutputPin,
+    le: OutputPin,
     output: DecOutput,
 }
 
@@ -34,37 +30,47 @@ enum DecOutput {
     Y7 = 7,
 }
 
+// TODO make use of LE pin
 impl Dec {
-    // TODO
-    pub(super) fn new(pins: (A0PinNr, A1PinNr, A2PinNr)) -> Result<Self, PinInitError> {
-        drop(pins);
-        Ok(Self {
+    pub(super) fn new(pins: (A0PinNr, A1PinNr, A2PinNr, LEPinNr)) -> error::DisplayResult<Self> {
+        let mut dec = Self {
             // a: [
-            //     OutputPinPlaceholder,
-            //     OutputPinPlaceholder,
-            //     OutputPinPlaceholder,
+            //     Gpio::new()?.get(pins.0)?.into_output_low(),
+            //     Gpio::new()?.get(pins.1)?.into_output_low(),
+            //     Gpio::new()?.get(pins.2)?.into_output_low(),
             // ],
-            a0: OutputPinPlaceholder,
-            a1: OutputPinPlaceholder,
-            a2: OutputPinPlaceholder,
+            a0: Gpio::new()?.get(pins.0)?.into_output(),
+            a1: Gpio::new()?.get(pins.1)?.into_output(),
+            a2: Gpio::new()?.get(pins.2)?.into_output(),
+            le: Gpio::new()?.get(pins.3)?.into_output(),
             output: DecOutput::default(),
-        })
+        };
+
+        dec.a0.set_low();
+        dec.a1.set_low();
+        dec.a2.set_low();
+        dec.le.set_low();
+
+        Ok(dec)
     }
 
+    /// Update the decoder output.
+    ///
+    /// This function takes at least 1 microsecond
     fn update(&mut self) {
         self.a0.write(match self.output as u8 & 0b1 {
-            0 => LevelPlaceholder::Low,
-            1 => LevelPlaceholder::High,
+            0 => Level::Low,
+            1 => Level::High,
             _ => unreachable!(),
         });
-        self.a1.write(match self.output as u8 & 0b1 {
-            0 => LevelPlaceholder::Low,
-            1 => LevelPlaceholder::High,
+        self.a1.write(match (self.output as u8 >> 1) & 0b1 {
+            0 => Level::Low,
+            1 => Level::High,
             _ => unreachable!(),
         });
-        self.a2.write(match self.output as u8 & 0b1 {
-            0 => LevelPlaceholder::Low,
-            1 => LevelPlaceholder::High,
+        self.a2.write(match (self.output as u8 >> 2) & 0b1 {
+            0 => Level::Low,
+            1 => Level::High,
             _ => unreachable!(),
         });
 
@@ -76,53 +82,31 @@ impl Dec {
         //     }
         // }
 
-        // use DecOutput::*;
-        // match self.output {
-        //     Y0 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_low();
-        //     }
-        //     Y1 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y2 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y3 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y4 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y5 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y6 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        //     Y7 => {
-        //         self.a0.set_low();
-        //         self.a1.set_low();
-        //         self.a2.set_high();
-        //     }
-        // }
+        spin_wait(Duration::from_micros(1));
     }
 
+    /// Set the decoder output to a specific position.
+    ///
+    /// This function takes at least 1 microsecond.
     pub(super) fn set(&mut self, num: usize) {
         self.output = DecOutput::from(num);
+        self.update();
+    }
+
+    /// Lock the decoder output.
+    ///
+    /// This function takes at least 1 microsecond.
+    pub(super) fn latch_on(&mut self) {
+        self.le.set_high();
+        spin_wait(Duration::from_micros(1));
+    }
+
+    /// Unlock the decoder output.
+    ///
+    /// This function takes at least 1 microsecond.
+    pub(super) fn latch_off(&mut self) {
+        self.le.set_low();
+        spin_wait(Duration::from_micros(1));
     }
 }
 

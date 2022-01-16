@@ -1,36 +1,39 @@
 use crate::display::LedColor;
 
+/// The types of message that can be sent to the display thread.
 #[derive(Debug)]
 pub(super) enum Message {
     Stop,
     Pause,
-    // Resume,
     Sync(SyncType),
 }
 
-/// Indicates the current state of the `DisplayInterface`
+/// Indicates the current state of the `DisplayInterface`.
 pub trait State {}
 
-/// The running state of `DisplayInterface`
+/// The running state of `DisplayInterface`.
+#[doc(hidden)]
 pub struct Running;
 impl State for Running {}
 
-/// The paused state of `DisplayInterface`
+/// The paused state of `DisplayInterface`.
+#[doc(hidden)]
 pub struct Paused;
 impl State for Paused {}
 
-/// The stopped state of `DisplayInterface`
+/// The stopped state of `DisplayInterface`.
+#[doc(hidden)]
 pub struct Stopped;
 impl State for Stopped {}
 
-/// Data struct to change a led's color
+/// Data struct to change a led's color.
 #[derive(Debug)]
 pub struct Sync {
-    /// x position
+    /// The x position of the led to be changed.
     pub x: usize,
-    /// y position
+    /// The y position of the led to be changed.
     pub y: usize,
-    /// new color
+    /// The new color the led should have.
     pub color: LedColor,
 }
 
@@ -44,17 +47,10 @@ pub struct Sync {
 /// Use [SyncType::All] to change the color of all leds at once.
 #[derive(Debug)]
 pub enum SyncType {
-    /// Can change one led's color at a time.
+    /// Change the color of one led.
     Single(Sync),
-    /// Can change multiple led's colors at a time.
+    /// Change the color of a vector of leds.
     Multi(Vec<Sync>),
-    /// Can change all led colors at the same time.
+    /// Change the color of all leds.
     All(Vec<Vec<LedColor>>),
 }
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum State {
-//     Running,
-//     Paused,
-//     Stopped,
-// }
