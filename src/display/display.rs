@@ -1,7 +1,7 @@
 // use rppal::{gpio, gpio::Gpio, gpio::OutputPin};
 use crate::{
     breakpoint_sbs,
-    display::{Dec, ShiftReg},
+    display::{Dec, Rotation, ShiftReg},
     error, spin_wait, PinConfig, Sync, SyncType,
 };
 use std::time::{Duration, Instant};
@@ -68,7 +68,8 @@ impl<const W: usize, const H: usize> Display<W, H> {
         breakpoint_sbs!();
         let start_time = Instant::now();
         for (c_index, c) in self.display.iter().enumerate() {
-            // shift everything into the register
+            self.row.clear(); // empty the shift registers
+                              // shift everything into the register
             for (r_index, r) in c.iter().enumerate() {
                 self.row.shift_color(r);
 
@@ -105,17 +106,61 @@ impl<const W: usize, const H: usize> Display<W, H> {
                     }
                 }
             }
-        }
-    }
-}
+            SyncType::Rotate(r) => match r {
+                Rotation::Clockwise => {
+                    let center = ((W - 1) as f64 / 2., (H - 1) as f64 / 2.);
+                    let mut disp_rotated = [[LedColor::default(); W]; H];
+                    for (y, r) in self.display.iter().enumerate() {
+                        for (x, c) in r.iter().enumerate() {
+                            // clockwise rotation
+                            // x => -y
+                            // y => x
+                            let x_new = -(y as f64 - center.1) + center.0;
+                            let y_new = x as f64 - center.0 + center.1;
+                            disp_rotated[y_new as usize][x_new as usize] = *c;
+                        }
+                    }
+                    self.display = disp_rotated;
+                }
+                Rotation::CounterClockwise => {
+                    let center = ((W - 1) as f64 / 2., (H - 1) as f64 / 2.);
+                    let mut disp_rotated = [[LedColor::default(); W]; H];
+                    for (y, r) in self.display.iter().enumerate() {
+                        for (x, c) in r.iter().enumerate() {
+                            // counterclockwise rotation
+                            // x => y
+                            // y => -x
+                            let x_new = y as f64 - center.1 + center.0;
+                            let y_new = -(x as f64 - center.0) + center.1;
+                            disp_rotated[y_new as usize][x_new as usize] = *c;
+                        }
+                    }
+                    self.display = disp_rotated;
+                }
+                Rotation::OneEighty => {
+                    // TODO improve with swap() and ranges 0..W/2   0..H/2
+                    let center = ((W - 1) as f64 / 2., (H - 1) as f64 / 2.);
+                    let mut disp_rotated = [[LedColor::default(); W]; H];
+                    for (y, r) in self.display.iter().enumerate() {
+                        for (x, c) in r.iter().enumerate() {
+                            // 180° rotation
+                            // x => -y
+                            // y => -x
+                            let x_new = -(x as f64 - center.0) + center.0;
+                            let y_new = -(y as f64 - center.1) + center.1;
+                            disp_rotated[y_new as usize][x_new as usize] = *c;
+                        }
+                    }
+                    self.display = disp_rotated;
 
-impl<const W: usize, const H: usize> Drop for Display<W, H> {
-    fn drop(&mut self) {
-        self.row.disable();
-        self.column.latch_off();
-        self.column.set(0);
-        self.column.latch_on();
-        self.row.clear();
+                    // for c in 0..H / 2 {
+                    //     for r in 0..W / 2 {
+                    //         std::mem::swap(&mut self.display[c][r], &mut self.display[H - c][W - r]);
+                    //     }
+                    // }
+                }
+            },
+        }
     }
 }
 

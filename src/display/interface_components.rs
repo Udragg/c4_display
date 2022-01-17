@@ -37,6 +37,17 @@ pub struct Sync {
     pub color: LedColor,
 }
 
+/// The amount to rotate.
+#[derive(Debug)]
+pub enum Rotation {
+    /// Rotate 90° clockwise.
+    Clockwise,
+    /// Rotate 90° counterclockwise.
+    CounterClockwise,
+    /// Rotate 180°.
+    OneEighty,
+}
+
 //? additional board manipulation options (rotate, shift, ...)
 /// The synchronization type. Synchronization is used to update which led has which color.
 ///
@@ -53,4 +64,6 @@ pub enum SyncType {
     Multi(Vec<Sync>),
     /// Change the color of all leds.
     All(Vec<Vec<LedColor>>),
+    /// Rotate the entire grid.
+    Rotate(Rotation),
 }

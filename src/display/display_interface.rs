@@ -167,6 +167,7 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Running, W, H> {
                     }
                 }
             }
+            SyncType::Rotate(_) => (),
         }
         match &self.tx {
             Some(tx) => tx

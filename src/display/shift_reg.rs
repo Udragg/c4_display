@@ -116,15 +116,12 @@ impl ShiftReg {
     ///
     /// This function takes at least 4 microseconds.
     pub(super) fn clear(&mut self) {
-        self.srclr.set_high();
-        spin_wait(Duration::from_micros(1));
         self.srclr.set_low();
         spin_wait(Duration::from_micros(1));
-        self.rclk.set_high();
-        spin_wait(Duration::from_micros(1));
-        self.rclk.set_low();
+        self.srclr.set_high();
         spin_wait(Duration::from_micros(1));
     }
+
     /// Clear the register
     ///
     /// This function takes at least 4 microseconds.

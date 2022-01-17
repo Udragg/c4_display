@@ -135,7 +135,7 @@ impl From<usize> for DecOutput {
             5 => DecOutput::Y5,
             6 => DecOutput::Y6,
             7 => DecOutput::Y7,
-            _ => unreachable!(),
+            _ => unimplemented!(),
         }
     }
 }

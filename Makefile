@@ -1,18 +1,12 @@
-target = armv7-unknown-linux-gnueabihf
-usr = udragg
-pass = udragg
-ip_home = 192.168.0.29
-dest = code/rust/c4_display/src
-source = ./src
+all: main run
 
-all: main
+debug:
+	cargo build --features sbs_debug
+	screen -S c4_display cargo run
 
 main:
-	cargo build --release --target=$(target)
+	cargo build --release
 
-write:
-	sftp $(usr)@$(ip_home)
-	$(pass)
-	cd $(dest)
-	put -r $(source)
-	exit
+run:
+	screen -S c4_display sudo ./target/release/c4_display
+
