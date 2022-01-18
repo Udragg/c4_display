@@ -1,8 +1,8 @@
 all: main run
 
 debug:
-	cargo build --features sbs_debug
-	screen -S c4_display cargo run
+	cargo build --features 'sbs_debug disp_debug'
+	screen -S c4_display sudo ./target/debug/c4_display
 
 main:
 	cargo build --release
