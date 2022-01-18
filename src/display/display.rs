@@ -67,11 +67,11 @@ impl<const W: usize, const H: usize> Display<W, H> {
         log::debug!("Starting run");
         breakpoint_sbs!();
         let start_time = Instant::now();
-        for (c_index, c) in self.display.iter().enumerate() {
+        for (c_index, row) in self.display.iter().enumerate() {
             self.row.clear(); // empty the shift registers
                               // shift everything into the register
-            for (r_index, r) in c.iter().enumerate() {
-                self.row.shift_color(r);
+            for (r_index, color) in row.iter().enumerate() {
+                self.row.shift_color(color);
 
                 let acc_wait_time =
                     self.tpl * (r_index + 1) as u32 + (self.tpl * (c_index * W) as u32);

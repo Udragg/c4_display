@@ -1,4 +1,4 @@
-use c4_display::{DisplayInterface, LedColor, PinConfig, Rotation, SyncType};
+use c4_display::{DisplayInterface, LedColor, PinConfig, Rotation, Running, Stopped, SyncType};
 
 const W: usize = 4;
 const H: usize = 4;
@@ -8,20 +8,21 @@ fn main() {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let mut disp: DisplayInterface<_, 4, 4> = DisplayInterface::<_, W, H>::new("id").start(
-        60.,
-        PinConfig {
-            sr_serin: 24,
-            sr_srclk: 23,
-            sr_rclk: 18,
-            sr_srclr: 15,
-            sr_oe: 14,
-            dec_a0: 6,
-            dec_a1: 13,
-            dec_a2: 19,
-            dec_le: 26,
-        },
-    );
+    let mut disp: DisplayInterface<Running, 4, 4> = DisplayInterface::<Stopped, W, H>::new("id")
+        .start(
+            60.,
+            PinConfig {
+                sr_serin: 24,
+                sr_srclk: 23,
+                sr_rclk: 18,
+                sr_srclr: 15,
+                sr_oe: 14,
+                dec_a0: 6,
+                dec_a1: 13,
+                dec_a2: 19,
+                dec_le: 26,
+            },
+        );
 
     loop {
         let mut input = String::new();

@@ -7,7 +7,9 @@ mod display;
 mod error;
 
 // Crate API exports
-pub use display::{DisplayInterface, LedColor, Rotation, State, Sync, SyncType};
+pub use display::{
+    DisplayInterface, LedColor, Paused, Rotation, Running, State, Stopped, Sync, SyncType,
+};
 pub use error::{DisplayResult, Error};
 
 #[allow(dead_code)]
