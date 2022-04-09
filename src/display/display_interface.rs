@@ -6,8 +6,10 @@ use std::{
 
 use crate::{
     display::{interface_components::*, Display, DisplayManager, LedColor},
-    error, PinConfig,
+    error, DisplayResult, Error, PinConfig,
 };
+
+use super::animation::Animation;
 
 /// An interface for the display created by the crate.
 ///
@@ -15,7 +17,7 @@ use crate::{
 #[derive(Debug)]
 pub struct DisplayInterface<'d, S: State, const W: usize, const H: usize> {
     handle: Option<thread::JoinHandle<()>>,
-    tx: Option<Sender<Message>>,
+    tx: Option<Sender<Instruction>>,
     state: PhantomData<S>,
     id: &'d str,
 }
@@ -59,19 +61,22 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Stopped, W, H> {
         }
     }
 
-    /// Start the display. It will run at the given refresh rate and make use of the gpio pins provided in `PinConfig`.
+    /// Start the display. It will run at the given refresh rate and make use of the gpio pins
+    /// provided in `PinConfig`.
     ///
-    /// This function creates a new thread with the name `disp: id` where `id` is the id given to the display interface upon creation.
+    /// This function creates a new thread with the name `disp: id` where `id` is the id given
+    /// to the display interface upon creation.
     pub fn start(self, refresh: f64, pins: PinConfig) -> DisplayInterface<'d, Running, W, H> {
-        let (tx, rx) = channel::<Message>();
+        let (tx, rx) = channel::<Instruction>();
         let disp = match Display::<W, H>::init(refresh, pins) {
             Ok(disp) => disp,
-            Err(e) => panic!("failed to initialise diplay: {}", e), // TODO return error to user.
+            // TODO return error to user.
+            Err(e) => panic!("failed to initialise diplay: {}", e),
         };
         let handle = thread::Builder::new()
             .name(String::from(format!("disp: {}", self.id)))
             .spawn(move || DisplayManager::new(disp, rx).start())
-            .expect("Failed to spawn display thread");
+            .expect("Couldn't spawn display thread");
 
         DisplayInterface::<'d, Running, W, H> {
             handle: Some(handle),
@@ -83,20 +88,19 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Stopped, W, H> {
 }
 
 impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Running, W, H> {
-    /// Stops the display thread. All used pins will be reset to their default state and any information regarding the colors of the display will be lost.
+    /// Stops the display thread. All used pins will be reset to their default state and any
+    /// information regarding the colors of the display will be lost.
     ///
-    /// The display will only stop after it completes its current cycle. So it is possible it stops `1/refresh` seconds after it has been told to stop.
+    /// The display will only stop after it completes its current cycle. So it is possible it
+    /// stops `1/refresh` seconds after it has been told to stop.
     ///
     /// The pin configuration however will be remembered.
     ///
-    /// This is meant to be used when the display is no longer needed, and will be called automatically when the `DisplayInterface` instance is dropped.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no `Sender` or no thread `JoinHandle` is present or if sending the stop message failed. (Neither of these should happen. If it does it is a fault inside of the crate.)
+    /// This is meant to be used when the display is no longer needed, and will be called
+    /// automatically when the `DisplayInterface` instance is dropped.
     pub fn stop(self) -> DisplayInterface<'d, Stopped, W, H> {
         match self.tx {
-            Some(tx) => tx.send(Message::Stop).expect("Failed to send message"),
+            Some(tx) => tx.send(Instruction::Stop).expect("Failed to send message"),
             None => panic!("State machine broke: no sender found"),
         };
 
@@ -113,14 +117,11 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Running, W, H> {
         }
     }
 
-    /// Pause the display thread. The display will no longer update but all data regarding its color and io pins state will remain.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no `Sender` is present or if sending the pause message failed. (Neither of these should happen. If it does it is a fault inside of the crate.)
+    /// Pause the display thread. The display will no longer update but all data regarding
+    /// its color and io pins state will remain.
     pub fn pause(self) -> DisplayInterface<'d, Paused, W, H> {
         match &self.tx {
-            Some(tx) => tx.send(Message::Pause).expect("Failed to send message"),
+            Some(tx) => tx.send(Instruction::Pause).expect("Failed to send message"),
             None => panic!("State machine broke: no thread handle found"),
         }
         DisplayInterface::<'d, Paused, W, H> {
@@ -135,14 +136,13 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Running, W, H> {
     ///
     /// # Errors
     ///
-    /// Returns a `c4_display::error::Error::InvalidDim` if the dimensions are out of bounds in the case of `SyncType::Single` or `SyncType::Multi`.
-    /// In The case of `SyncType::All` this error is returned if the length of any of the vectors do not match
+    /// Returns a `c4_display::error::Error::InvalidDim` if the dimensions are out
+    /// of bounds in the case of `SyncType::Single` or `SyncType::Multi`.
+    /// In The case of `SyncType::All` this error is returned if the length
+    /// of any of the vectors do not match
     ///
-    /// Returns a `c4_display::error::Error::InvalidDim` if the length of the vectors do not match the provided width and height in the case of `SyncType::All`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no `Sender` is present or if the sync data failed to send. (Neither of this should happen. If it does it is a fault inside of the crate.)
+    /// Returns a `c4_display::error::Error::InvalidDim` if the length of the vectors
+    /// do not match the provided width and height in the case of `SyncType::All`.
     pub fn sync(&mut self, sync_type: SyncType) -> error::DisplayResult<()> {
         match &sync_type {
             SyncType::Single(sync) => {
@@ -171,20 +171,45 @@ impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Running, W, H> {
         }
         match &self.tx {
             Some(tx) => tx
-                .send(Message::Sync(sync_type))
+                .send(Instruction::Sync(sync_type))
                 .expect("Failed to send message"),
-            None => panic!("State machine broke: no thread handle found"),
+            None => panic!("No sender exists"),
         }
         Ok(())
+    }
+
+    /// Add an animation
+    pub fn add_animation(&mut self, animation: Animation) -> DisplayResult<()> {
+        for frames in &animation.frames {
+            for (x, y, _) in &frames.leds {
+                if x >= &W || y >= &H {
+                    return Err(Error::InvalidDim);
+                }
+            }
+        }
+
+        match &self.tx {
+            Some(tx) => tx
+                .send(Instruction::AddAnimation(animation))
+                .expect("No receiver exists"),
+            None => panic!("No sender exists"),
+        }
+        Ok(())
+    }
+
+    /// Clear all active animations
+    pub fn clear_animations(&mut self) {
+        match &self.tx {
+            Some(tx) => tx
+                .send(Instruction::ClearAnimations)
+                .expect("No receiver exists"),
+            None => panic!("No sender exists"),
+        }
     }
 }
 
 impl<'d, const W: usize, const H: usize> DisplayInterface<'d, Paused, W, H> {
     /// Resume the display thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no thread `JoinHandle` is present. (This should not happen. If it does it is a fault inside of the crate.)
     pub fn resume(self) -> DisplayInterface<'d, Running, W, H> {
         match &self.handle {
             Some(handle) => handle.thread().unpark(),
@@ -211,11 +236,14 @@ impl<'d, S: State, const W: usize, const H: usize> DisplayInterface<'d, S, W, H>
     }
 
     /// Creates an empty board with
-    pub fn sync_template() -> [[LedColor; W]; H] {
-        [[LedColor::default(); W]; H]
+    pub fn sync_template() -> SyncTemplate<W, H> {
+        SyncTemplate {
+            board: [[LedColor::default(); W]; H],
+        }
     }
 
-    /// Returns the width and height of the display. The witdh is stored in the first place and height in the second.
+    /// Returns the width and height of the display.
+    /// The witdh is stored in the first place and height in the second.
     pub fn get_dim(&self) -> (usize, usize) {
         (W, H)
     }

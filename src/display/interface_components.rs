@@ -1,11 +1,13 @@
-use crate::display::LedColor;
+use super::{animation::Animation, LedColor, LedState};
 
 /// The types of message that can be sent to the display thread.
 #[derive(Debug)]
-pub(super) enum Message {
+pub(super) enum Instruction {
     Stop,
     Pause,
     Sync(SyncType),
+    AddAnimation(Animation),
+    ClearAnimations,
 }
 
 /// Indicates the current state of the `DisplayInterface`.
@@ -34,7 +36,7 @@ pub struct Sync {
     /// The y position of the led to be changed.
     pub y: usize,
     /// The new color the led should have.
-    pub color: LedColor,
+    pub state: LedState,
 }
 
 /// The amount to rotate.
@@ -63,7 +65,15 @@ pub enum SyncType {
     /// Change the color of a vector of leds.
     Multi(Vec<Sync>),
     /// Change the color of all leds.
-    All(Vec<Vec<LedColor>>),
+    All(Vec<Vec<LedState>>),
     /// Rotate the entire grid.
     Rotate(Rotation),
 }
+
+pub struct SyncTemplate<const W: usize, const H: usize> {
+    pub board: [[LedColor; W]; H],
+}
+
+// impl<const W: usize, const H: usize> SyncTemplate<W, H> {
+//     pub fn
+// }

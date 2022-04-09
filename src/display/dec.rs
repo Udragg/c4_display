@@ -1,11 +1,9 @@
-use std::time::Duration;
-
 use rppal::gpio::{Gpio, Level, OutputPin};
 
 use crate::{
     error,
-    pins::{A0PinNr, A1PinNr, A2PinNr, LEPinNr},
-    spin_wait,
+    pins::{A0PinNr, A1PinNr, A2PinNr, E1PinNr, LEPinNr},
+    spin_wait, PSWT,
 };
 
 #[derive(Debug)]
@@ -15,6 +13,7 @@ pub(super) struct Dec {
     a1: OutputPin,
     a2: OutputPin,
     le: OutputPin,
+    e1: OutputPin,
     output: DecOutput,
 }
 
@@ -32,7 +31,9 @@ enum DecOutput {
 
 // TODO make use of LE pin
 impl Dec {
-    pub(super) fn new(pins: (A0PinNr, A1PinNr, A2PinNr, LEPinNr)) -> error::DisplayResult<Self> {
+    pub(super) fn new(
+        pins: (A0PinNr, A1PinNr, A2PinNr, LEPinNr, E1PinNr),
+    ) -> error::DisplayResult<Self> {
         let mut dec = Self {
             // a: [
             //     Gpio::new()?.get(pins.0)?.into_output_low(),
@@ -43,6 +44,7 @@ impl Dec {
             a1: Gpio::new()?.get(pins.1)?.into_output(),
             a2: Gpio::new()?.get(pins.2)?.into_output(),
             le: Gpio::new()?.get(pins.3)?.into_output(),
+            e1: Gpio::new()?.get(pins.4)?.into_output(),
             output: DecOutput::default(),
         };
 
@@ -50,13 +52,16 @@ impl Dec {
         dec.a1.set_low();
         dec.a2.set_low();
         dec.le.set_low();
+        dec.e1.set_low();
+
+        dec.e1.set_pwm_frequency(2_400.0, 0.90)?;
 
         Ok(dec)
     }
 
     /// Update the decoder output.
     ///
-    /// This function takes at least 1 microsecond
+    /// This function takes at least `PinSwitchTime`
     fn update(&mut self) {
         self.a0.write(match self.output as u8 & 0b1 {
             0 => Level::Low,
@@ -82,12 +87,12 @@ impl Dec {
         //     }
         // }
 
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Set the decoder output to a specific position.
     ///
-    /// This function takes at least 1 microsecond.
+    /// This function takes at least `PinSwitchTime`.
     pub(super) fn set(&mut self, num: usize) {
         self.output = DecOutput::from(num);
         self.update();
@@ -95,18 +100,18 @@ impl Dec {
 
     /// Lock the decoder output.
     ///
-    /// This function takes at least 1 microsecond.
+    /// This function takes at least `PinSwitchTime`.
     pub(super) fn latch_on(&mut self) {
         self.le.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Unlock the decoder output.
     ///
-    /// This function takes at least 1 microsecond.
+    /// This function takes at least `PinSwitchTime`.
     pub(super) fn latch_off(&mut self) {
         self.le.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 }
 
@@ -178,7 +183,8 @@ impl std::ops::Sub<usize> for DecOutput {
             Self::Y6,
             Self::Y7,
         ];
-        member_arr[(((self as isize - rhs as isize) % 8) + 8) as usize % 8] // convert to positive valid index
+        // convert to positive valid index
+        member_arr[(((self as isize - rhs as isize) % 8) + 8) as usize % 8]
     }
 }
 

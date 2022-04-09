@@ -1,28 +1,36 @@
-use c4_display::{DisplayInterface, LedColor, PinConfig, Rotation, Running, Stopped, SyncType};
+use std::str::FromStr;
 
-const W: usize = 4;
-const H: usize = 4;
+use c4_display::{
+    Animation, DisplayInterface, LedColor, LedState, PinConfig, Rotation, Running, Stopped,
+    SyncType,
+};
+
+const W: usize = 7;
+const H: usize = 7;
 
 fn main() {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let mut disp: DisplayInterface<Running, 4, 4> = DisplayInterface::<Stopped, W, H>::new("id")
+    let mut disp: DisplayInterface<Running, W, H> = DisplayInterface::<Stopped, W, H>::new("id")
         .start(
-            60.,
+            60.0,
             PinConfig {
-                sr_serin: 24,
-                sr_srclk: 23,
-                sr_rclk: 18,
-                sr_srclr: 15,
-                sr_oe: 14,
-                dec_a0: 6,
-                dec_a1: 13,
-                dec_a2: 19,
-                dec_le: 26,
+                sr_serin: 17,
+                sr_srclk: 22,
+                sr_rclk: 23,
+                sr_srclr: 24,
+                sr_oe: 27,
+                dec_a0: 25,
+                dec_a1: 11,
+                dec_a2: 5,
+                dec_le: 6,
+                dec_e1: 10,
             },
         );
+
+    println!("started");
 
     loop {
         let mut input = String::new();
@@ -32,30 +40,6 @@ fn main() {
                 disp.stop();
                 break;
             }
-            "red" | "r" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Red; W]; H]))
-                .unwrap(),
-            "green" | "g" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Green; W]; H]))
-                .unwrap(),
-            "blue" | "b" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Blue; W]; H]))
-                .unwrap(),
-            "yellow" | "y" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Yellow; W]; H]))
-                .unwrap(),
-            "magenta" | "m" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Magenta; W]; H]))
-                .unwrap(),
-            "cyan" | "c" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Cyan; W]; H]))
-                .unwrap(),
-            "white" | "w" => disp
-                .sync(SyncType::All(vec![vec![LedColor::White; W]; H]))
-                .unwrap(),
-            "off" | "o" => disp
-                .sync(SyncType::All(vec![vec![LedColor::Off; W]; H]))
-                .unwrap(),
             "left" | "counterclockwise" | "cc" => disp
                 .sync(SyncType::Rotate(Rotation::CounterClockwise))
                 .unwrap(),
@@ -63,27 +47,19 @@ fn main() {
                 disp.sync(SyncType::Rotate(Rotation::Clockwise)).unwrap()
             }
             "180" => disp.sync(SyncType::Rotate(Rotation::OneEighty)).unwrap(),
-            "custom" => disp
+            "circle" => disp
+                .add_animation(Animation::from_file("./animations/circle.mtxani").unwrap())
+                .unwrap(),
+            "ca" => disp.clear_animations(),
+            color if LedColor::from_str(color).is_ok() => disp
                 .sync(SyncType::All(vec![
                     vec![
-                        LedColor::Green,
-                        LedColor::Blue,
-                        LedColor::Blue,
-                        LedColor::Blue,
-                    ],
-                    vec![
-                        LedColor::Green,
-                        LedColor::Blue,
-                        LedColor::White,
-                        LedColor::White,
-                    ],
-                    vec![
-                        LedColor::Green,
-                        LedColor::Green,
-                        LedColor::Red,
-                        LedColor::White,
-                    ],
-                    vec![LedColor::Red, LedColor::Red, LedColor::Red, LedColor::White],
+                        LedState::with_color(
+                            LedColor::from_str(color).unwrap()
+                        );
+                        W
+                    ];
+                    H
                 ]))
                 .unwrap(),
             _ => println!("Invalid: {}", input.trim()),

@@ -15,3 +15,6 @@ pub use interface_components::*;
 
 mod display_manager;
 use display_manager::*;
+
+mod animation;
+pub use animation::*;

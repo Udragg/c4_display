@@ -1,9 +1,8 @@
 use rppal::gpio::{Gpio, OutputPin};
-use std::time::Duration;
 
 use super::LedColor;
 use crate::pins::{OePinNr, RclkPinNr, SerinPinNr, SrclkPinNr, SrclrPinNr};
-use crate::{error, spin_wait};
+use crate::{error, spin_wait, PSWT};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -50,6 +49,7 @@ impl ShiftReg {
         sr.rclk.set_low();
         sr.srclr.set_high();
         sr.oe.set_low();
+        // sr.oe.set_pwm_frequency(100_000.0, 0.5).unwrap();
         Ok(sr)
     }
 
@@ -58,7 +58,7 @@ impl ShiftReg {
     /// This function takes at least 1 microsecond
     pub(super) fn enable(&mut self) {
         self.oe.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Disable the shift register
@@ -66,22 +66,22 @@ impl ShiftReg {
     /// This function takes at least 1 microsecond
     pub(super) fn disable(&mut self) {
         self.oe.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Push the input register to the output register
     ///
-    /// This function takes at least 2 microseconds
+    /// This function takes at least 2x `PinSwitchTime`
     pub(super) fn push(&mut self) {
         self.rclk.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self.rclk.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Shift a [LedColor] into the shift register.
     ///
-    /// This function takes at least 9 microseconds.
+    /// This function takes at least 9x `PinSwitchTime`.
     pub(super) fn shift_color(&mut self, color: &LedColor) {
         for c_bit in 0..3 {
             self.shift((*color as usize >> c_bit & 1) != 0);
@@ -90,50 +90,56 @@ impl ShiftReg {
 
     /// Shift one bit into the shift register.
     ///
-    /// This function takes at least 3 microseconds.
+    /// This function takes at least 3x `PinSwitchTime`.
     fn shift(&mut self, bit: bool) {
         match bit {
             true => {
                 self.serin.set_high();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
                 self.srclk.set_high();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
                 self.srclk.set_low();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
             }
             false => {
                 self.serin.set_low();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
                 self.srclk.set_high();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
                 self.srclk.set_low();
-                spin_wait(Duration::from_micros(1));
+                spin_wait(PSWT);
             }
         }
     }
 
     /// Clear the register
     ///
-    /// This function takes at least 4 microseconds.
+    /// This function takes at least 4x `PinSwitchTime`.
     pub(super) fn clear(&mut self) {
         self.srclr.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self.srclr.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
     }
 
     /// Clear the register
     ///
-    /// This function takes at least 4 microseconds.
+    /// This function takes at least 4x `PinSwitchTime`.
     fn _clear(mut self) -> Self {
         self.srclr.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self.srclr.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self.rclk.set_high();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self.rclk.set_low();
-        spin_wait(Duration::from_micros(1));
+        spin_wait(PSWT);
         self
     }
 }
+
+// impl Drop for ShiftReg {
+//     fn drop(&mut self) {
+//         self.oe.clear_pwm().unwrap();
+//     }
+// }

@@ -1,0 +1,18 @@
+animation
+loop true
+repeats 0
+keep_last false
+
+frame
+dur 1000
+rst true
+3 3 red 100 200
+
+frame
+dur 3000
+rst true
+3 3 blue 500 1000
+3 2 green
+3 4 green
+2 3 green
+4 3 green

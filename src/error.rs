@@ -1,11 +1,18 @@
+use crate::display::AnimationParseError;
+
 /// Types of error
 #[derive(Debug)]
 pub enum Error {
     /// The provided dimensions do not match or exceed the dimensions of the display.
     InvalidDim,
     /// GPIO error return by rppal.
-    // Gpio(rppal::gpio::error),
     Gpio(rppal::gpio::Error),
+    /// A necessary variable is not initiated.
+    Uninitiated,
+    /// The given file could not be found.
+    FileNotFound,
+    /// The animation could not be parsed from string.
+    ParseError(AnimationParseError),
 }
 
 /// Result used by functions in this crate.
