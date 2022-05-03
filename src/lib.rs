@@ -78,6 +78,7 @@ pub fn spin_wait(dur: Duration) {
     while t.elapsed() < dur {
         std::hint::spin_loop();
     }
+    // std::thread::sleep(dur);
 }
 
 // /// Stops code execution until an enter is received from `stdin`.

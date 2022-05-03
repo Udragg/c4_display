@@ -25,24 +25,26 @@ impl<const W: usize, const H: usize> DisplayManager<W, H> {
 
     /// Start the display.
     pub(super) fn start(&mut self) {
-        loop {
+        'outer: loop {
             let start_time = std::time::Instant::now();
             // get new sync instructions
-            match self.rx.try_recv() {
-                Ok(msg) => match msg {
-                    Instruction::Pause => {
-                        thread::park();
-                        continue;
+            'inner: loop {
+                match self.rx.try_recv() {
+                    Ok(msg) => match msg {
+                        Instruction::Pause => {
+                            thread::park();
+                            continue 'outer;
+                        }
+                        Instruction::Stop => break 'outer,
+                        Instruction::Sync(sync_type) => self.disp.sync(sync_type),
+                        Instruction::AddAnimation(animation) => self.animations.push(animation),
+                        Instruction::ClearAnimations => self.animations.clear(),
+                    },
+                    Err(TryRecvError::Empty) => break 'inner,
+                    Err(TryRecvError::Disconnected) => {
+                        log::error!("Display interface disconnected. Stopping thread...");
+                        break 'outer;
                     }
-                    Instruction::Stop => break,
-                    Instruction::Sync(sync_type) => self.disp.sync(sync_type),
-                    Instruction::AddAnimation(animation) => self.animations.push(animation),
-                    Instruction::ClearAnimations => self.animations.clear(),
-                },
-                Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => {
-                    log::error!("Display interface disconnected. Stopping thread...");
-                    break;
                 }
             }
 
